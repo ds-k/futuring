@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Send, Paperclip, Inbox, LockOpen, Key } from "lucide-react";
+import { Mail, Send, Paperclip, Inbox, LockOpen, Key, X } from "lucide-react";
 import {
   generateRSAKeyPair,
   encryptMessageWithHybrid,
   decryptMessageWithHybrid,
 } from "../utils/crypto";
+import { useRef } from "react";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"send" | "receive">("send");
@@ -33,6 +34,10 @@ export default function Home() {
   const [receiveMessage, setReceiveMessage] = useState("");
   const [receivePrivateKey, setReceivePrivateKey] = useState("");
   const [decryptedContent, setDecryptedContent] = useState("");
+  const [decryptedImage, setDecryptedImage] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const handleGenerateKey = async () => {
     try {
@@ -56,6 +61,28 @@ export default function Home() {
     }
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("이미지 크기는 2MB 이하여야 합니다.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setSelectedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -72,8 +99,10 @@ export default function Home() {
         throw new Error("수신자의 RSA 공개키가 필요합니다.");
       }
 
+      const messageBody = JSON.stringify({ text: formData.content, image: selectedImage });
+
       const encryptedContent = await encryptMessageWithHybrid(
-        formData.content,
+        messageBody,
         formData.recipientPublicKey,
       );
 
@@ -82,7 +111,8 @@ export default function Home() {
         content: encryptedContent,
       };
 
-      const response = await fetch("http://localhost:8000/messages", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -102,6 +132,7 @@ export default function Home() {
         scheduledAt: "",
         content: "",
       });
+      setSelectedImage(null);
       setTimeout(() => setStatus("idle"), 3000);
     } catch (error: any) {
       setStatus("error");
@@ -115,6 +146,7 @@ export default function Home() {
     setReceiveStatus("loading");
     setReceiveMessage("");
     setDecryptedContent("");
+    setDecryptedImage(null);
 
     try {
       if (!receivePrivateKey) {
@@ -122,9 +154,8 @@ export default function Home() {
       }
 
       // 1) IPFS에서 데이터 가져오기
-      const response = await fetch(
-        `https://gateway.pinata.cloud/ipfs/${receiveCid}`,
-      );
+      const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://gateway.pinata.cloud";
+      const response = await fetch(`${gatewayUrl}/ipfs/${receiveCid}`);
       if (!response.ok) {
         throw new Error("IPFS에서 데이터를 찾을 수 없습니다.");
       }
@@ -142,9 +173,18 @@ export default function Home() {
         receivePrivateKey,
       );
 
+      let parsedData;
+      try {
+        parsedData = JSON.parse(decryptedText);
+      } catch (e) {
+        // 기존의 단순 텍스트 메시지 호환성 처리
+        parsedData = { text: decryptedText, image: null };
+      }
+
+      setDecryptedContent(parsedData.text);
+      setDecryptedImage(parsedData.image);
       setReceiveStatus("success");
-      setReceiveMessage("성공적으로 타임캡슐을 해독했습니다!");
-      setDecryptedContent(decryptedText);
+      setReceiveMessage("타임캡슐 해독에 성공했습니다! 🎉");
     } catch (error: any) {
       setReceiveStatus("error");
       setReceiveMessage(error.message || "해독에 실패했습니다.");
@@ -204,24 +244,39 @@ export default function Home() {
                 <span className="w-full sm:w-32 text-sm font-medium text-gray-400">
                   Public Key
                 </span>
-                <div className="flex-1 flex gap-2">
-                  <input
-                    type="text"
-                    name="recipientPublicKey"
-                    className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-300"
-                    placeholder="수신자의 RSA 공개키 (또는 발급 버튼 클릭)"
-                    value={formData.recipientPublicKey}
-                    onChange={handleChange}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={handleGenerateKey}
-                    className="flex items-center justify-center gap-1 px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-md hover:bg-gray-200 transition-colors whitespace-nowrap"
-                  >
-                    <Key size={12} />
-                    임시 키 발급
-                  </button>
+                <div className="flex-1 flex flex-col gap-2">
+                  <div className="flex flex-1 gap-2">
+                    <input
+                      type="text"
+                      name="recipientPublicKey"
+                      className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-300"
+                      placeholder="수신자의 RSA 공개키 (또는 발급 버튼 클릭)"
+                      value={formData.recipientPublicKey}
+                      onChange={handleChange}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGenerateKey}
+                      className="flex items-center justify-center gap-1 px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-md hover:bg-gray-200 transition-colors whitespace-nowrap"
+                    >
+                      <Key size={12} />
+                      임시 키 발급
+                    </button>
+                  </div>
+                  
+                  {selectedImage && (
+                    <div className="relative mt-2 inline-block">
+                      <img src={selectedImage} alt="Preview" className="h-20 w-auto rounded-md border border-gray-200 object-cover" />
+                      <button 
+                        type="button" 
+                        onClick={removeImage}
+                        className="absolute -top-2 -right-2 bg-white rounded-full p-0.5 shadow-sm border border-gray-200 text-gray-500 hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -292,10 +347,19 @@ export default function Home() {
 
             {/* Bottom Action Bar */}
             <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-4 py-4 sm:px-8 relative min-h-[72px] shrink-0">
-              <div className="flex gap-2 sm:gap-3 z-10">
+              <div className="hidden sm:flex items-center bg-gray-50/80 backdrop-blur-md p-1.5 rounded-full border border-gray-100 shadow-sm z-10">
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  onChange={handleImageUpload} 
+                />
                 <button
                   type="button"
-                  className="flex items-center justify-center rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-200"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 rounded-full text-gray-500 hover:bg-gray-200/50 hover:text-gray-700 transition-colors"
+                  title="사진 첨부하기"
                 >
                   <Paperclip size={18} />
                 </button>
@@ -408,6 +472,9 @@ export default function Home() {
                           {receiveMessage}
                         </div>
                         <div className="flex-1 p-4 bg-white rounded-xl text-left text-gray-700 whitespace-pre-wrap border border-gray-100 shadow-inner overflow-y-auto">
+                          {decryptedImage && (
+                            <img src={decryptedImage} alt="Decrypted" className="max-w-full h-auto rounded-lg mb-4 border border-gray-200" />
+                          )}
                           {decryptedContent}
                         </div>
                       </div>
