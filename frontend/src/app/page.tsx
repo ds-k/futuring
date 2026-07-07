@@ -106,9 +106,11 @@ export default function Home() {
         formData.recipientPublicKey,
       );
 
+      const localDate = new Date(formData.scheduledAt);
       const payload = {
         ...formData,
         content: encryptedContent,
+        scheduledAt: localDate.toISOString(),
       };
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
