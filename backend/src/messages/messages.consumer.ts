@@ -41,12 +41,12 @@ export class MessagesConsumer extends WorkerHost {
       this.logger.log(`[Worker] 🔗 블록체인 스마트 컨트랙트에 기록 중...`);
       const txHash = await this.blockchainService.recordTx(message.recipientDid, message.cid);
 
-      // 3. 이메일 발송 (이메일 형태인지 간단 검증)
-      if (message.recipientDid.includes('@')) {
+      // 3. 이메일 발송 (이메일 주소로 무조건 발송)
+      if (message.recipientEmail) {
         this.logger.log(`[Worker] 📧 수신자에게 이메일 알림 발송 중...`);
-        await this.emailService.sendCapsuleArrivalEmail(message.recipientDid, message.cid);
+        await this.emailService.sendCapsuleArrivalEmail(message.recipientEmail, message.cid);
       } else {
-        this.logger.log(`[Worker] 수신자가 지갑 주소이므로 이메일 발송은 생략합니다.`);
+        this.logger.warn(`[Worker] 수신자 이메일 정보가 없어 이메일 발송을 생략합니다.`);
       }
 
       // 4. DB 상태 업데이트

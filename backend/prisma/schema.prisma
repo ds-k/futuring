@@ -10,6 +10,8 @@ model Message {
   id            String   @id @default(uuid())
   cid           String   // IPFS CID (암호화된 파일의 해시)
   senderDid     String   // 보내는 사람의 DID
+  recipientEmail String   @default("") // 받는 사람의 이메일 (알림용)
+
   recipientDid  String   // 받는 사람의 DID (또는 이메일)
   scheduledAt   DateTime // 발송 예정 시간
   status        String   @default("PENDING") // PENDING, SENT, FAILED

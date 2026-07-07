@@ -28,6 +28,7 @@ export class MessagesService {
       data: {
         cid,
         senderDid: dto.senderDid,
+        recipientEmail: dto.recipientEmail,
         recipientDid: dto.recipientDid,
         scheduledAt,
       },
