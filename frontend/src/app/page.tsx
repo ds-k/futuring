@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { Mail, Send, Paperclip, Inbox, LockOpen, Key } from "lucide-react";
-import { generateRSAKeyPair, encryptMessageWithHybrid } from "../utils/crypto";
+import {
+  generateRSAKeyPair,
+  encryptMessageWithHybrid,
+  decryptMessageWithHybrid,
+} from "../utils/crypto";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"send" | "receive">("send");
@@ -27,6 +31,8 @@ export default function Home() {
     "idle" | "loading" | "success" | "error"
   >("idle");
   const [receiveMessage, setReceiveMessage] = useState("");
+  const [receivePrivateKey, setReceivePrivateKey] = useState("");
+  const [decryptedContent, setDecryptedContent] = useState("");
 
   const handleGenerateKey = async () => {
     try {
@@ -42,7 +48,9 @@ export default function Home() {
       a.download = "future_message_private_key.txt";
       a.click();
       URL.revokeObjectURL(url);
-      alert("키쌍이 생성되었습니다! 다운로드된 개인키(Private Key)를 안전한 곳에 보관하세요.");
+      alert(
+        "키쌍이 생성되었습니다! 다운로드된 개인키(Private Key)를 안전한 곳에 보관하세요.",
+      );
     } catch (error) {
       alert("키 생성에 실패했습니다.");
     }
@@ -63,10 +71,10 @@ export default function Home() {
       if (!formData.recipientPublicKey) {
         throw new Error("수신자의 RSA 공개키가 필요합니다.");
       }
-      
+
       const encryptedContent = await encryptMessageWithHybrid(
         formData.content,
-        formData.recipientPublicKey
+        formData.recipientPublicKey,
       );
 
       const payload = {
@@ -102,16 +110,45 @@ export default function Home() {
     }
   };
 
-  const handleReceive = (e: React.FormEvent) => {
+  const handleReceive = async (e: React.FormEvent) => {
     e.preventDefault();
     setReceiveStatus("loading");
     setReceiveMessage("");
+    setDecryptedContent("");
 
-    // 시뮬레이션: 1.5초 후 성공
-    setTimeout(() => {
+    try {
+      if (!receivePrivateKey) {
+        throw new Error("해독을 위한 개인키가 필요합니다.");
+      }
+
+      // 1) IPFS에서 데이터 가져오기
+      const response = await fetch(
+        `https://gateway.pinata.cloud/ipfs/${receiveCid}`,
+      );
+      if (!response.ok) {
+        throw new Error("IPFS에서 데이터를 찾을 수 없습니다.");
+      }
+      const data = await response.json();
+
+      // 2) 암호화된 페이로드 추출
+      const encryptedPayload = data.message;
+      if (!encryptedPayload) {
+        throw new Error("유효하지 않은 타임캡슐 데이터입니다.");
+      }
+
+      // 3) 복호화 진행
+      const decryptedText = await decryptMessageWithHybrid(
+        encryptedPayload,
+        receivePrivateKey,
+      );
+
       setReceiveStatus("success");
-      setReceiveMessage("지갑 서명을 통해 성공적으로 타임캡슐을 해독했습니다!");
-    }, 1500);
+      setReceiveMessage("성공적으로 타임캡슐을 해독했습니다!");
+      setDecryptedContent(decryptedText);
+    } catch (error: any) {
+      setReceiveStatus("error");
+      setReceiveMessage(error.message || "해독에 실패했습니다.");
+    }
   };
 
   return (
@@ -149,7 +186,9 @@ export default function Home() {
             <div className="flex flex-col gap-5 px-4 py-6 sm:px-8 sm:py-8 flex-1 overflow-y-auto">
               {/* Recipient Email & DID inputs */}
               <div className="flex flex-col sm:flex-row sm:items-center border-b border-gray-100 pb-3 gap-2 sm:gap-0 shrink-0">
-                <span className="w-full sm:w-32 text-sm font-medium text-gray-400">Email</span>
+                <span className="w-full sm:w-32 text-sm font-medium text-gray-400">
+                  Email
+                </span>
                 <input
                   type="email"
                   name="recipientEmail"
@@ -161,8 +200,10 @@ export default function Home() {
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center border-b border-gray-100 pb-3 gap-2 sm:gap-0 mt-3 sm:mt-4 shrink-0">
-                <span className="w-full sm:w-32 text-sm font-medium text-gray-400">Public Key</span>
+              <div className="flex flex-col sm:flex-row sm:items-center border-b border-gray-100 pb-3 gap-2 sm:gap-0 shrink-0">
+                <span className="w-full sm:w-32 text-sm font-medium text-gray-400">
+                  Public Key
+                </span>
                 <div className="flex-1 flex gap-2">
                   <input
                     type="text"
@@ -184,8 +225,10 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center border-b border-gray-100 pb-3 gap-2 sm:gap-0 mt-3 sm:mt-4 shrink-0">
-                <span className="w-full sm:w-32 text-sm font-medium text-gray-400">Wallet</span>
+              <div className="flex flex-col sm:flex-row sm:items-center border-b border-gray-100 pb-3 gap-2 sm:gap-0 shrink-0">
+                <span className="w-full sm:w-32 text-sm font-medium text-gray-400">
+                  Wallet
+                </span>
                 <input
                   type="text"
                   name="recipientDid"
@@ -296,11 +339,8 @@ export default function Home() {
             onSubmit={handleReceive}
             className="flex flex-col flex-1 bg-white overflow-hidden"
           >
-            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 overflow-y-auto">
-              <div className="w-full max-w-md flex flex-col gap-6 items-center text-center">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 mb-2 border border-gray-100 shadow-sm">
-                  <Inbox size={32} />
-                </div>
+            <div className="flex-1 flex flex-col p-6 sm:p-8 overflow-y-auto">
+              <div className="w-full flex flex-col items-center text-center mb-6">
                 <div>
                   <h2 className="text-xl font-bold text-gray-800">
                     타임캡슐 열기
@@ -311,65 +351,125 @@ export default function Home() {
                     지갑을 연결하여 캡슐의 암호를 해독하세요.
                   </p>
                 </div>
+              </div>
 
-                <input
-                  type="text"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-gray-400 focus:bg-white transition-colors text-center"
-                  placeholder="타임캡슐 CID 입력 (예: QmXyZ...)"
-                  value={receiveCid}
-                  onChange={(e) => setReceiveCid(e.target.value)}
-                  required
-                />
-
-                {receiveStatus === "success" && (
-                  <div className="w-full rounded-lg bg-green-50 px-5 py-4 text-center text-sm font-medium text-green-800 border border-green-100">
-                    {receiveMessage}
-                    <br />
-                    <span className="block mt-2 text-xs opacity-70">
-                      &quot;안녕! 50년 전의 내가 보내는 편지야...&quot;
-                    </span>
+              <div className="w-full max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 h-full min-h-[250px]">
+                {/* Left: Inputs */}
+                <div className="flex flex-col gap-4 bg-gray-50/50 border border-gray-100 rounded-2xl p-5 shadow-sm h-full">
+                  <h3 className="text-sm font-semibold text-gray-700">
+                    입력 정보
+                  </h3>
+                  <div className="flex flex-col gap-3 flex-1">
+                    <input
+                      type="text"
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-gray-400 transition-colors"
+                      placeholder="타임캡슐 CID 입력 (예: QmXyZ...)"
+                      value={receiveCid}
+                      onChange={(e) => setReceiveCid(e.target.value)}
+                      required
+                    />
+                    <textarea
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-gray-400 transition-colors flex-1 min-h-[120px] resize-none"
+                      placeholder="다운로드 받았던 개인키(Private Key) 내용을 여기에 붙여넣어주세요."
+                      value={receivePrivateKey}
+                      onChange={(e) => setReceivePrivateKey(e.target.value)}
+                      required
+                    />
                   </div>
-                )}
+                </div>
+
+                {/* Right: Results */}
+                <div className="flex flex-col gap-4 bg-gray-50/50 border border-gray-100 rounded-2xl p-5 shadow-sm h-full">
+                  <h3 className="text-sm font-semibold text-gray-700">
+                    해독 결과
+                  </h3>
+                  <div className="flex-1 flex flex-col items-center justify-center">
+                    {receiveStatus === "idle" && (
+                      <span className="text-gray-400 text-sm text-center">
+                        데이터를 입력하고 해독을 진행해주세요.
+                      </span>
+                    )}
+
+                    {receiveStatus === "loading" && (
+                      <span className="text-gray-400 text-sm text-center animate-pulse">
+                        암호를 해독하는 중...
+                      </span>
+                    )}
+
+                    {receiveStatus === "error" && (
+                      <div className="w-full rounded-lg bg-red-50 px-5 py-4 text-center text-sm font-medium text-red-800 border border-red-100">
+                        {receiveMessage}
+                      </div>
+                    )}
+
+                    {receiveStatus === "success" && (
+                      <div className="w-full h-full flex flex-col">
+                        <div className="w-full rounded-lg bg-green-50 px-4 py-3 text-center text-sm font-medium text-green-800 border border-green-100 mb-3 shrink-0">
+                          {receiveMessage}
+                        </div>
+                        <div className="flex-1 p-4 bg-white rounded-xl text-left text-gray-700 whitespace-pre-wrap border border-gray-100 shadow-inner overflow-y-auto">
+                          {decryptedContent}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Bottom Action Bar */}
-            <div className="flex items-center justify-end border-t border-gray-100 bg-gray-50 px-4 py-4 sm:px-8 relative min-h-[72px] shrink-0">
-              {/* Mobile Toggle (모바일에서만 보임, 가운데 정렬) */}
-              <div className="sm:hidden absolute left-1/2 -translate-x-1/2 flex items-center bg-white/60 backdrop-blur-xl p-1.5 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.08)] z-20 border border-white/60">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("send")}
-                  className="p-2 px-5 rounded-full transition-all flex items-center justify-center text-gray-500 hover:bg-white/50"
-                >
-                  <Mail size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("receive")}
-                  className="p-2 px-5 rounded-full transition-all flex items-center justify-center bg-white text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
-                >
-                  <Inbox size={16} />
-                </button>
+            <div className="flex flex-col border-t border-gray-100 bg-gray-50 px-4 py-4 sm:px-8 relative min-h-[72px] shrink-0">
+              <div className="flex items-center justify-between w-full">
+                {/* 빈 공간 차지 (Mobile Toggle 중앙 정렬 유지 위함) */}
+                <div className="hidden sm:block w-[100px]"></div>
+
+                {/* Mobile Toggle (모바일에서만 보임, 가운데 정렬) */}
+                <div className="sm:hidden absolute left-1/2 -translate-x-1/2 top-4 flex items-center bg-white/60 backdrop-blur-xl p-1.5 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.08)] z-20 border border-white/60">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("send")}
+                    className="p-2 px-5 rounded-full transition-all flex items-center justify-center text-gray-500 hover:bg-white/50"
+                  >
+                    <Mail size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("receive")}
+                    className="p-2 px-5 rounded-full transition-all flex items-center justify-center bg-white text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                  >
+                    <Inbox size={16} />
+                  </button>
+                </div>
+
+                <div className="flex flex-col items-end gap-2 z-10 sm:w-auto w-full flex-1">
+                  <button
+                    type="submit"
+                    disabled={
+                      receiveStatus === "loading" ||
+                      !receiveCid ||
+                      !receivePrivateKey
+                    }
+                    className="flex items-center justify-center gap-2 rounded-full bg-neutral-900 h-10 w-10 sm:w-auto sm:h-11 sm:px-6 text-sm font-medium text-white transition-all hover:bg-neutral-800 hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ml-auto"
+                    title="개인키(Private Key)로 해독하기"
+                  >
+                    <LockOpen size={16} />
+                    <span className="hidden sm:inline-block">
+                      {receiveStatus === "loading"
+                        ? "해독 중..."
+                        : "개인키로 해독하기"}
+                    </span>
+                  </button>
+                </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={
-                  receiveStatus === "loading" ||
-                  receiveStatus === "success" ||
-                  !receiveCid
-                }
-                className="flex items-center justify-center gap-2 rounded-full bg-neutral-900 h-10 w-10 sm:w-auto sm:h-11 sm:px-6 text-sm font-medium text-white transition-all hover:bg-neutral-800 hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 z-10"
-                title="지갑으로 해독하기"
-              >
-                <LockOpen size={16} />
-                <span className="hidden sm:inline-block">
-                  {receiveStatus === "loading"
-                    ? "해독 중..."
-                    : "지갑으로 해독하기"}
+              {/* MVP Disclaimer text (Centered at the bottom of the form) */}
+              <div className="w-full mt-4 text-center">
+                <span className="text-[10px] text-gray-400">
+                  * 실제 서비스에서는 지갑을 연동하여 지갑 내부의 키로
+                  해독되지만, MVP 테스트를 위해 다운로드 받은 개인키를 직접
+                  입력하도록 구현되었습니다.
                 </span>
-              </button>
+              </div>
             </div>
           </form>
         )}

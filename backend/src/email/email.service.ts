@@ -1,29 +1,45 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private transporter: nodemailer.Transporter;
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     this.init();
   }
 
   async init() {
     try {
-      // Ethereal 가상 이메일 계정 생성 (테스트용)
-      const testAccount = await nodemailer.createTestAccount();
-      this.transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false, // true for 465, false for other ports
-        auth: {
-          user: testAccount.user, 
-          pass: testAccount.pass, 
-        },
-      });
-      this.logger.log('📧 Ethereal Email SMTP connected!');
+      const smtpUser = this.configService.get<string>('SMTP_USER');
+      const smtpPass = this.configService.get<string>('SMTP_PASS');
+
+      if (smtpUser && smtpPass) {
+        // 실제 SMTP 계정 사용 (예: Gmail)
+        this.transporter = nodemailer.createTransport({
+          service: 'gmail', // Gmail을 사용할 경우 간편 설정
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        });
+        this.logger.log(`📧 Real SMTP connected for ${smtpUser}!`);
+      } else {
+        // .env에 설정이 없으면 Ethereal 가상 이메일 사용 (폴백)
+        const testAccount = await nodemailer.createTestAccount();
+        this.transporter = nodemailer.createTransport({
+          host: 'smtp.ethereal.email',
+          port: 587,
+          secure: false,
+          auth: {
+            user: testAccount.user, 
+            pass: testAccount.pass, 
+          },
+        });
+        this.logger.log('⚠️ SMTP_USER/PASS not found. Using Ethereal Email (Mock).');
+      }
     } catch (error) {
       this.logger.error('Failed to init email service', error);
     }
@@ -55,11 +71,14 @@ export class EmailService {
 
       this.logger.log(`✅ Email sent: ${info.messageId}`);
       
-      // Ethereal은 실제 발송 대신 '미리보기 URL'을 제공합니다. MVP 시연용으로 매우 훌륭합니다.
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      this.logger.log(`🔗 Email Preview URL: ${previewUrl}`);
+      // Ethereal 계정으로 보냈을 때만 미리보기 URL을 출력합니다.
+      if (!this.configService.get<string>('SMTP_USER')) {
+        const previewUrl = nodemailer.getTestMessageUrl(info);
+        this.logger.log(`🔗 Ethereal Email Preview URL: ${previewUrl}`);
+        return previewUrl;
+      }
       
-      return previewUrl;
+      return info.messageId;
     } catch (error) {
       this.logger.error('Email sending failed', error);
       throw error;
