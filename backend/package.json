@@ -26,6 +26,7 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "@upstash/redis": "^1.38.0",
     "bullmq": "^5.79.3",
     "ioredis": "^5.11.1",

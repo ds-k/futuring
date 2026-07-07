@@ -1,31 +1,44 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PinataSDK } from 'pinata';
 
 @Injectable()
 export class IpfsService {
-  private pinata: PinataSDK;
   private readonly logger = new Logger(IpfsService.name);
+  private readonly pinataJwt: string;
 
   constructor(private configService: ConfigService) {
-    this.pinata = new PinataSDK({
-      pinataJwt: this.configService.get<string>('PINATA_JWT'),
-    });
+    this.pinataJwt = this.configService.get<string>('PINATA_JWT') || '';
   }
 
   /**
    * 텍스트(문자열)를 IPFS에 업로드하고 CID를 반환합니다.
-   * @param text 업로드할 문자열 데이터 (예: 암호화된 메시지 내용)
-   * @param fileName 저장할 파일명
-   * @returns IPFS CID (Content Identifier)
+   * Pinata의 JSON 업로드 API를 사용하여 텍스트 데이터를 감싸서 저장합니다.
    */
-  async uploadText(text: string, fileName: string = 'message.txt'): Promise<string> {
+  async uploadText(text: string): Promise<string> {
     try {
-      // Pinata SDK는 File 객체를 요구하므로 메모리 상에서 File 객체 생성
-      const file = new File([text], fileName, { type: 'text/plain' });
-      const upload = await this.pinata.upload.file(file);
-      this.logger.log(`IPFS 업로드 성공: ${upload.IpfsHash}`);
-      return upload.IpfsHash;
+      const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.pinataJwt}`,
+        },
+        body: JSON.stringify({
+          pinataContent: {
+            message: text,
+          },
+          pinataMetadata: {
+            name: 'futuring-message.json',
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Pinata API Error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      this.logger.log(`IPFS 업로드 성공: ${data.IpfsHash}`);
+      return data.IpfsHash;
     } catch (error) {
       this.logger.error('IPFS 업로드 실패', error);
       throw error;
