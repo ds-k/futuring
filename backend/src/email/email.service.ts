@@ -34,11 +34,13 @@ export class EmailService {
           port: 587,
           secure: false,
           auth: {
-            user: testAccount.user, 
-            pass: testAccount.pass, 
+            user: testAccount.user,
+            pass: testAccount.pass,
           },
         });
-        this.logger.log('⚠️ SMTP_USER/PASS not found. Using Ethereal Email (Mock).');
+        this.logger.log(
+          '⚠️ SMTP_USER/PASS not found. Using Ethereal Email (Mock).',
+        );
       }
     } catch (error) {
       this.logger.error('Failed to init email service', error);
@@ -64,20 +66,20 @@ export class EmailService {
               <p style="margin: 10px 0 0 0; font-weight: bold; color: #111827; word-break: break-all;">${cid}</p>
             </div>
             <br/><br/>
-            <a href="http://localhost:3000" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 999px; font-weight: bold;">타임캡슐 열기</a>
+            <a href="https://futuring-mail.vercel.app" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 999px; font-weight: bold;">타임캡슐 열기</a>
           </div>
         `,
       });
 
       this.logger.log(`✅ Email sent: ${info.messageId}`);
-      
+
       // Ethereal 계정으로 보냈을 때만 미리보기 URL을 출력합니다.
       if (!this.configService.get<string>('SMTP_USER')) {
         const previewUrl = nodemailer.getTestMessageUrl(info);
         this.logger.log(`🔗 Ethereal Email Preview URL: ${previewUrl}`);
         return previewUrl;
       }
-      
+
       return info.messageId;
     } catch (error) {
       this.logger.error('Email sending failed', error);
