@@ -264,19 +264,6 @@ export default function Home() {
                       임시 키 발급
                     </button>
                   </div>
-                  
-                  {selectedImage && (
-                    <div className="relative mt-2 inline-block">
-                      <img src={selectedImage} alt="Preview" className="h-20 w-auto rounded-md border border-gray-200 object-cover" />
-                      <button 
-                        type="button" 
-                        onClick={removeImage}
-                        className="absolute -top-2 -right-2 bg-white rounded-full p-0.5 shadow-sm border border-gray-200 text-gray-500 hover:text-red-500"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -324,14 +311,28 @@ export default function Home() {
                 />
               </div>
 
-              <textarea
-                name="content"
-                className="mt-4 w-full flex-1 resize-none bg-transparent text-base leading-relaxed text-gray-800 outline-none placeholder:text-gray-300 min-h-[150px]"
-                placeholder="Write a message to the future..."
-                value={formData.content}
-                onChange={handleChange}
-                required
-              ></textarea>
+              <div className="flex flex-col flex-1 mt-4 relative shrink-0 min-h-[200px]">
+                {selectedImage && (
+                  <div className="relative mb-3 inline-block self-start shrink-0">
+                    <img src={selectedImage} alt="Preview" className="max-h-32 sm:max-h-40 w-auto rounded-lg border border-gray-200 object-contain shadow-sm" />
+                    <button 
+                      type="button" 
+                      onClick={removeImage}
+                      className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-md border border-gray-200 text-gray-500 hover:text-red-500 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                <textarea
+                  name="content"
+                  className="w-full flex-1 resize-none bg-transparent text-base leading-relaxed text-gray-800 outline-none placeholder:text-gray-300 min-h-[120px]"
+                  placeholder="Write a message to the future..."
+                  value={formData.content}
+                  onChange={handleChange}
+                  required
+                ></textarea>
+              </div>
 
               {status === "success" && (
                 <div className="mt-4 rounded-lg bg-green-50 px-5 py-3 text-center text-sm font-medium text-green-800 shrink-0">
