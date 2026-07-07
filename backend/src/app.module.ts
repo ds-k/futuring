@@ -7,6 +7,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { IpfsModule } from './ipfs/ipfs.module';
 import { MessagesModule } from './messages/messages.module';
 import { QueueModule } from './queue/queue.module';
+import { EmailModule } from './email/email.module';
+import { BlockchainModule } from './blockchain/blockchain.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { QueueModule } from './queue/queue.module';
     IpfsModule,
     QueueModule,
     MessagesModule,
+    EmailModule,
+    BlockchainModule,
   ],
   controllers: [AppController],
   providers: [AppService],

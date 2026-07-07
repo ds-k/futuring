@@ -5,9 +5,11 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { IpfsModule } from '../ipfs/ipfs.module';
 import { QueueModule } from '../queue/queue.module';
 
+import { MessagesConsumer } from './messages.consumer';
+
 @Module({
   imports: [PrismaModule, IpfsModule, QueueModule],
-  providers: [MessagesService],
+  providers: [MessagesService, MessagesConsumer],
   controllers: [MessagesController]
 })
 export class MessagesModule {}
