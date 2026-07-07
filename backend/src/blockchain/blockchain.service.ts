@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class BlockchainService {
@@ -8,7 +9,7 @@ export class BlockchainService {
   private wallet: ethers.Wallet;
   
   // 추후 실제 배포된 스마트 컨트랙트 주소를 넣습니다.
-  private contractAddress = process.env.CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000';
+  private contractAddress: string;
   
   // 컴파일된 MessageVault.sol의 ABI
   private readonly abi = [
@@ -16,16 +17,17 @@ export class BlockchainService {
     "function recordMessage(address recipient, string cid) public"
   ];
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
+    this.contractAddress = this.configService.get<string>('CONTRACT_ADDRESS') || '0x0000000000000000000000000000000000000000';
     this.init();
   }
 
   private init() {
     try {
-      const rpcUrl = process.env.POLYGON_AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology';
+      const rpcUrl = this.configService.get<string>('POLYGON_AMOY_RPC_URL') || 'https://rpc-amoy.polygon.technology';
       this.provider = new ethers.JsonRpcProvider(rpcUrl);
       
-      const privateKey = process.env.PRIVATE_KEY;
+      const privateKey = this.configService.get<string>('PRIVATE_KEY');
       if (privateKey) {
         this.wallet = new ethers.Wallet(privateKey, this.provider);
         this.logger.log(`🔗 Blockchain Service initialized with Wallet: ${this.wallet.address}`);
