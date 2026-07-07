@@ -5,6 +5,12 @@
 
 ---
 
+## 🔗 서비스 배포 링크 (Live Demo)
+- **웹사이트 (프론트엔드):** [https://futuring-mail.vercel.app/](https://futuring-mail.vercel.app/)
+- **백엔드 API (Render):** [https://futuring-vsz1.onrender.com/](https://futuring-vsz1.onrender.com/)
+
+---
+
 ## 📚 기획 및 아키텍처 문서 (Documentation)
 
 본 프로젝트의 기획 의도와 기술적 의사결정 과정, 그리고 새롭게 학습한 기술들에 대한 문서는 아래 링크에서 확인할 수 있습니다.
