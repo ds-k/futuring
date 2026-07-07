@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Message {
+  id            String   @id @default(uuid())
+  cid           String   // IPFS CID (암호화된 파일의 해시)
+  senderDid     String   // 보내는 사람의 DID
+  recipientDid  String   // 받는 사람의 DID (또는 이메일)
+  scheduledAt   DateTime // 발송 예정 시간
+  status        String   @default("PENDING") // PENDING, SENT, FAILED
+  txHash        String?  // 발송 성공 후 블록체인에 기록된 트랜잭션 해시
+  cryptoVersion String   @default("1.0")     // 양자 컴퓨터 대비 버전 관리용
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
